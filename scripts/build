@@ -21,6 +21,11 @@ python -m pip install -e .
 
 APP_NAME="Pro Tools Plugin Sync"
 CLI_WHEEL_DIR="dist/cli-wheel"
+if [[ -n "${VERSION:-}" ]]; then
+  DMG_NAME="pro-tools-plugin-sync-${VERSION}.dmg"
+else
+  DMG_NAME="pro-tools-plugin-sync-local.dmg"
+fi
 
 rm -rf "$CLI_WHEEL_DIR"
 python -m build --wheel --outdir "$CLI_WHEEL_DIR"
@@ -42,7 +47,6 @@ python -m PyInstaller \
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "dist/$APP_NAME.app/Contents/Info.plist" 2>/dev/null \
   || /usr/libexec/PlistBuddy -c "Set :LSUIElement true" "dist/$APP_NAME.app/Contents/Info.plist"
 
-DMG_NAME="pro-tools-plugin-sync-local.dmg"
 DMG_ROOT="dist/dmg-root"
 DMG_RW="dist/pro-tools-plugin-sync-rw.dmg"
 rm -rf "$DMG_ROOT"
@@ -175,8 +179,10 @@ rm -f "$DMG_RW"
 echo "Built dist/$APP_NAME.app"
 echo "Built $DMG_NAME"
 
-APP_PATH="$(pwd)/dist/$APP_NAME.app"
-if pgrep -f "$APP_NAME" >/dev/null 2>&1; then
-  pkill -f "$APP_NAME" || true
+if [[ -z "${CI:-}" && "${NO_OPEN:-}" != "1" ]]; then
+  APP_PATH="$(pwd)/dist/$APP_NAME.app"
+  if pgrep -f "$APP_NAME" >/dev/null 2>&1; then
+    pkill -f "$APP_NAME" || true
+  fi
+  open -n "$APP_PATH" || open "$APP_PATH"
 fi
-open -n "$APP_PATH" || open "$APP_PATH"
