@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plugin Update Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f4ef;
+      --card: #ffffff;
+      --accent: #2e5d68;
+      --muted: #5a6b71;
+      --border: #e2dfd6;
+      --shadow: rgba(25, 33, 38, 0.08);
+    }
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background: radial-gradient(circle at top, #fff6e5, #f6f4ef 55%);
+      color: #1d2427;
+    }
+    .page {
+      max-width: 1100px;
+      margin: 40px auto 60px;
+      padding: 0 24px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      padding: 24px 28px;
+      background: var(--card);
+      border-radius: 20px;
+      box-shadow: 0 12px 30px var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .title {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0 0 6px;
+    }
+    .subtitle {
+      color: var(--muted);
+      margin: 0;
+      font-size: 14px;
+    }
+    .status {
+      text-align: right;
+      font-size: 15px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+    }
+    .summary-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      box-shadow: 0 6px 16px var(--shadow);
+    }
+    .summary-card h3 {
+      margin: 0 0 6px;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .summary-card p {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .section {
+      margin-top: 28px;
+      background: var(--card);
+      border-radius: 20px;
+      padding: 20px 24px 10px;
+      border: 1px solid var(--border);
+      box-shadow: 0 10px 26px var(--shadow);
+    }
+    .section h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    thead th {
+      text-align: left;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 8px;
+    }
+    tbody td {
+      border-bottom: 1px solid var(--border);
+      padding: 12px 8px;
+      vertical-align: top;
+    }
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .footer {
+      margin-top: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    @media (max-width: 720px) {
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .status {
+        text-align: left;
+      }
+      table {
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div>
+        <h1 class="title">Plugin Update Report</h1>
+        <p class="subtitle">Machine: Studio-M1 | Generated: 2024-07-09T10:45:00-07:00</p>
+        <p class="subtitle">Latest versions sourced from: MixRig</p>
+      </div>
+      <div class="status">3 updates needed</div>
+    </div>
+    <div class="summary">
+      <div class="summary-card">
+        <h3>Total Updates</h3>
+        <p>3</p>
+      </div>
+      <div class="summary-card">
+        <h3>Missing</h3>
+        <p>1</p>
+      </div>
+      <div class="summary-card">
+        <h3>Outdated</h3>
+        <p>1</p>
+      </div>
+      <div class="summary-card">
+        <h3>Unknown Version</h3>
+        <p>1</p>
+      </div>
+    </div>
+    <div class="section">
+      <h2>Recommended Actions</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Plugin</th>
+            <th>Current</th>
+            <th>Latest</th>
+            <th>Reason</th>
+            <th>Source</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Beta Reverb</td><td>missing</td><td>3.0.0</td><td>Missing</td><td>MixRig</td><td>Install from MixRig (version 3.0.0).</td></tr>
+<tr><td>Alpha Compressor</td><td>1.2.0</td><td>1.4.1</td><td>Outdated</td><td>MixRig</td><td>Update from MixRig to version 1.4.1.</td></tr>
+<tr><td>Gamma Delay</td><td>unknown</td><td>2.2.0</td><td>Unknown version</td><td>MixRig</td><td>Verify version against MixRig.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="footer">pt-plugin-sync</div>
+  </div>
+</body>
+</html>

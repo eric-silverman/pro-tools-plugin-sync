@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pt-plugin-sync"
+version = "0.0.5"
+description = "Sync and compare Pro Tools plugin versions across machines."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Eric" }
+]
+dependencies = [
+  "dropbox>=11.36.0",
+  "pyobjc>=10.0",
+  "rumps>=0.4.0",
+  "watchdog>=3.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7.4.0",
+]
+
+[project.scripts]
+pt-plugin-sync = "pt_plugin_sync.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pt_plugin_sync = ["resources/*.png"]

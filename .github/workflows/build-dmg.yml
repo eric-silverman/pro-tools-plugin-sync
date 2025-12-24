@@ -1,0 +1,110 @@
+name: Build DMG
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+          python -m pip install -e .
+
+      - name: Build app bundle
+        run: |
+          python -m PyInstaller \
+            --windowed \
+            --name "Pro Tools Plugin Sync" \
+            --icon "src/pt_plugin_sync/resources/app_icon.icns" \
+            --add-data "src/pt_plugin_sync/resources:pt_plugin_sync/resources" \
+            src/pt_plugin_sync/menubar_app.py
+          /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "dist/Pro Tools Plugin Sync.app/Contents/Info.plist" 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Set :LSUIElement true" "dist/Pro Tools Plugin Sync.app/Contents/Info.plist"
+
+      - name: Build DMG
+        run: |
+          VERSION=$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          data = tomllib.loads(Path("pyproject.toml").read_text())
+          print(data["project"]["version"])
+          PY
+          )
+          DMG_NAME="pro-tools-plugin-sync-${VERSION}.dmg"
+          DMG_ROOT="dist/dmg-root"
+          DMG_RW="dist/pro-tools-plugin-sync-rw.dmg"
+          rm -rf "$DMG_ROOT"
+          mkdir -p "$DMG_ROOT"
+          cp -R "dist/Pro Tools Plugin Sync.app" "$DMG_ROOT/"
+          ln -s /Applications "$DMG_ROOT/Applications"
+          cat > "$DMG_ROOT/Fix Gatekeeper.command" <<'EOF'
+          #!/bin/bash
+          set -euo pipefail
+          APP_PATH="/Applications/Pro Tools Plugin Sync.app"
+          if [[ ! -d "$APP_PATH" ]]; then
+            echo "Couldn't find the app in Applications."
+            echo "First drag “Pro Tools Plugin Sync.app” into Applications, then run this again."
+            exit 1
+          fi
+          xattr -dr com.apple.quarantine "$APP_PATH"
+          echo "Done! You can open Pro Tools Plugin Sync now."
+          EOF
+          chmod +x "$DMG_ROOT/Fix Gatekeeper.command"
+          cat > "$DMG_ROOT/README.txt" <<'EOF'
+          If macOS says the app is damaged, it was blocked by Gatekeeper.
+          1) Drag “Pro Tools Plugin Sync.app” into Applications.
+          2) Double-click “Fix Gatekeeper.command”.
+          That’s it — the app should open normally now.
+          EOF
+          hdiutil create \
+            -volname "Pro Tools Plugin Sync" \
+            -srcfolder "$DMG_ROOT" \
+            -ov -format UDRW \
+            "$DMG_RW"
+          MOUNT_DIR="$(mktemp -d)"
+          hdiutil attach -readwrite -noverify -noautoopen -mountpoint "$MOUNT_DIR" "$DMG_RW"
+          case "$MOUNT_DIR" in
+            /tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*)
+              ;;
+            *)
+              echo "Unexpected DMG mount point: $MOUNT_DIR"
+              echo "Refusing to write volume icon outside a temp mount."
+              exit 1
+              ;;
+          esac
+          if [[ "$MOUNT_DIR" == "/" || "$MOUNT_DIR" == "/Volumes" || "$MOUNT_DIR" == "/System/Volumes" || "$MOUNT_DIR" == "/System/Volumes/Data" ]]; then
+            echo "Unsafe DMG mount point: $MOUNT_DIR"
+            exit 1
+          fi
+          cp "src/pt_plugin_sync/resources/app_icon.icns" "$MOUNT_DIR/.VolumeIcon.icns"
+          if command -v SetFile >/dev/null 2>&1; then
+            SetFile -a C "$MOUNT_DIR"
+          else
+            echo "SetFile not found; volume icon may not show."
+          fi
+          hdiutil detach "$MOUNT_DIR"
+          rm -rf "$MOUNT_DIR"
+          hdiutil convert "$DMG_RW" -format UDZO -o "$DMG_NAME"
+          rm -f "$DMG_RW"
+          echo "DMG_NAME=${DMG_NAME}" >> "$GITHUB_ENV"
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.DMG_NAME }}

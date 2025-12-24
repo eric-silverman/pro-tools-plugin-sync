@@ -1,0 +1,48 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.dylib
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env/
+
+# Packaging/build
+build/
+dist/
+pro-tools-plugin-sync-local.dmg
+*.egg-info/
+*.egg
+develop-eggs/
+eggs/
+.eggs/
+pip-wheel-metadata/
+wheelhouse/
+
+# Testing/coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# Lint/type check caches
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# Logs
+*.log
+
+# Editor/OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
