@@ -14,6 +14,10 @@ Sync and compare Pro Tools AAX plugin versions across machines by writing report
    - Control-click the app in `Applications`, choose “Open”, then confirm.
    - Or run `Fix Gatekeeper.command` from the DMG after copying the app to `Applications`.
 5) When the menu bar icon appears, open `Settings...` to complete setup.
+Optional CLI install (from the DMG):
+1) Double-click `Install CLI.command`.
+2) Activate the CLI: `source ~/.pt-plugin-sync-cli/bin/activate`
+3) Confirm it works: `pt-plugin-sync --help`
 
 ## Installation (from source / CLI)
 ```bash
@@ -44,7 +48,8 @@ You can configure via the menu bar app or the CLI. Both write `~/.config/pt-plug
 2) Confirm or change the plug-ins folder (default: `~/Library/Application Support/Avid/Audio/Plug-Ins`).
 3) Choose the reports folder (default: `~/Dropbox/Pro Tools Plugin Reports`).
 4) Confirm the machine name (used in report filenames).
-5) Click Save, then choose `Scan Now` to verify the first report.
+5) If using Dropbox API access, enter the app key/secret and click `Authorize Dropbox...`.
+6) Click Save, then choose `Scan Now` to verify the first report.
 
 ### CLI setup
 Run interactive setup:
@@ -77,6 +82,8 @@ pt-plugin-sync setup --plugins-path "/path/to/Plug-Ins" --reports-path "/path/to
 ```bash
 pt-plugin-sync setup --reports-backend dropbox
 ```
+If you are using the menu bar app, open `Settings...`, enter the app key/secret, then click
+`Authorize Dropbox...` to generate the refresh token without the CLI.
 
 Re-auth (if you need a new refresh token):
 ```bash

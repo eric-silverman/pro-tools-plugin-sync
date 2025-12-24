@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+from dataclasses import replace
 from email.parser import BytesParser
 from email.policy import default
 import threading
@@ -25,6 +26,7 @@ from .config import (
     validate_config,
     write_config,
 )
+from .dropbox_auth import DROPBOX_OAUTH_SCOPES
 
 
 class SettingsServer:
@@ -54,6 +56,10 @@ class SettingsServer:
         self._thread.start()
         return self._url
 
+    def dropbox_auth_url(self) -> str:
+        base = self.start()
+        return f"{base}dropbox-auth-start"
+
     def stop(self) -> None:
         if not self._server:
             return
@@ -70,18 +76,33 @@ class SettingsServer:
                 return
 
             def do_GET(self) -> None:  # noqa: N802
-                if self.path not in ("/", "/index.html"):
-                    self.send_error(HTTPStatus.NOT_FOUND)
+                if self.path in ("/", "/index.html"):
+                    notice = _pop_notice(server)
+                    body = _render_form(server._config, notice=notice)
+                    self._send_html(body)
                     return
-                notice = _pop_notice(server)
-                body = _render_form(server._config, notice=notice)
-                self._send_html(body)
+                if self.path == "/dropbox-auth-start":
+                    app_key = server._config.dropbox_app_key or ""
+                    app_secret = server._config.dropbox_app_secret or ""
+                    if not app_key or not app_secret:
+                        self._send_html(
+                            _render_error("Enter the Dropbox app key and secret first.")
+                        )
+                        return
+                    try:
+                        authorize_url = _dropbox_authorize_url(app_key, app_secret)
+                    except Exception as exc:
+                        self._send_html(_render_error(str(exc)))
+                        return
+                    self._send_html(
+                        _render_dropbox_auth(app_key, app_secret, authorize_url)
+                    )
+                    return
+                self.send_error(HTTPStatus.NOT_FOUND)
 
             def do_POST(self) -> None:  # noqa: N802
                 if self.path == "/save":
-                    length = int(self.headers.get("Content-Length", "0"))
-                    data = self.rfile.read(length).decode("utf-8")
-                    values = urllib.parse.parse_qs(data)
+                    values = _read_form_values(self)
                     try:
                         updated = _config_from_form(values, server._config)
                     except ValueError as exc:
@@ -92,6 +113,58 @@ class SettingsServer:
                         self._send_html(_render_error(error))
                         return
                     _set_notice(server, "Settings saved.")
+                    self.send_response(HTTPStatus.SEE_OTHER)
+                    self.send_header("Location", "/")
+                    self.end_headers()
+                    return
+                if self.path == "/dropbox-auth":
+                    values = _read_form_values(self)
+                    app_key = _get_text(values, "dropbox_app_key")
+                    app_secret = _get_text(values, "dropbox_app_secret")
+                    if not app_key or not app_secret:
+                        self._send_html(
+                            _render_error("Dropbox app key and secret are required.")
+                        )
+                        return
+                    try:
+                        authorize_url = _dropbox_authorize_url(app_key, app_secret)
+                    except Exception as exc:
+                        self._send_html(_render_error(str(exc)))
+                        return
+                    self._send_html(
+                        _render_dropbox_auth(app_key, app_secret, authorize_url)
+                    )
+                    return
+                if self.path == "/dropbox-finish":
+                    values = _read_form_values(self)
+                    app_key = _get_text(values, "dropbox_app_key")
+                    app_secret = _get_text(values, "dropbox_app_secret")
+                    auth_code = _get_text(values, "auth_code")
+                    if not app_key or not app_secret:
+                        self._send_html(
+                            _render_error("Dropbox app key and secret are required.")
+                        )
+                        return
+                    if not auth_code:
+                        self._send_html(_render_error("Authorization code is required."))
+                        return
+                    try:
+                        refresh_token = _dropbox_finish_auth(
+                            app_key, app_secret, auth_code
+                        )
+                    except Exception as exc:
+                        self._send_html(_render_error(str(exc)))
+                        return
+                    server._config = replace(
+                        server._config,
+                        dropbox_app_key=app_key,
+                        dropbox_app_secret=app_secret,
+                        dropbox_refresh_token=refresh_token,
+                    )
+                    _set_notice(
+                        server,
+                        "Dropbox refresh token captured. Click Save Settings to persist.",
+                    )
                     self.send_response(HTTPStatus.SEE_OTHER)
                     self.send_header("Location", "/")
                     self.end_headers()
@@ -394,7 +467,7 @@ def _render_form(config: Config, *, notice: str | None) -> str:
         <ol>
           <li>Visit <a href="https://www.dropbox.com/developers/apps" target="_blank" rel="noopener">Dropbox App Console</a>.</li>
           <li>Choose "Scoped access" and "App folder", then name the app.</li>
-          <li>Open the app, add scopes for read/write, and generate a refresh token.</li>
+          <li>Open the app, add scopes for read/write, then use "Authorize Dropbox..." below.</li>
         </ol>
         Helpful docs: <a href="https://dropbox.tech/developers/generate-an-access-token-for-your-own-account" target="_blank" rel="noopener">Generate a token</a>
       </div>
@@ -411,6 +484,9 @@ def _render_form(config: Config, *, notice: str | None) -> str:
       <label for="dropbox_refresh_token">Dropbox refresh token</label>
       <input id="dropbox_refresh_token" name="dropbox_refresh_token" value="{esc(config.dropbox_refresh_token or '')}">
       <div class="note">Needed only when using Dropbox as the backend.</div>
+
+      <button class="ghost" type="button" onclick="startDropboxAuth()">Authorize Dropbox...</button>
+      <div class="note">Runs the OAuth flow without the CLI and fills the refresh token.</div>
     </div>
 
       <div class="section">
@@ -420,10 +496,10 @@ def _render_form(config: Config, *, notice: str | None) -> str:
           <label for="prune_days">Prune reports (days)</label>
           <input id="prune_days" name="prune_days" value="{config.prune_days}">
         </div>
-        <div class="checkbox">
-          <input id="hash_binaries" name="hash_binaries" type="checkbox" {hash_checked}>
-          <label for="hash_binaries">Hash binaries</label>
-        </div>
+      </div>
+      <div class="checkbox">
+        <input id="hash_binaries" name="hash_binaries" type="checkbox" {hash_checked}>
+        <label for="hash_binaries">Hash binaries</label>
       </div>
         <div class="checkbox">
           <input id="auto_update_download" name="auto_update_download" type="checkbox" {auto_update_checked}>
@@ -453,6 +529,30 @@ def _render_form(config: Config, *, notice: str | None) -> str:
     }}
     backend.addEventListener('change', toggleDropbox);
     toggleDropbox();
+
+    function startDropboxAuth() {{
+      const appKey = document.getElementById('dropbox_app_key').value.trim();
+      const appSecret = document.getElementById('dropbox_app_secret').value.trim();
+      if (!appKey || !appSecret) {{
+        window.alert('Enter the Dropbox app key and secret first.');
+        return;
+      }}
+      const form = document.createElement('form');
+      form.method = 'post';
+      form.action = '/dropbox-auth';
+      const keyField = document.createElement('input');
+      keyField.type = 'hidden';
+      keyField.name = 'dropbox_app_key';
+      keyField.value = appKey;
+      const secretField = document.createElement('input');
+      secretField.type = 'hidden';
+      secretField.name = 'dropbox_app_secret';
+      secretField.value = appSecret;
+      form.appendChild(keyField);
+      form.appendChild(secretField);
+      document.body.appendChild(form);
+      form.submit();
+    }}
   </script>
 </body>
 </html>
@@ -584,6 +684,141 @@ def _extract_multipart_file(body: bytes, content_type: str, field_name: str) -> 
             raise ValueError("Uploaded file is empty.")
         return payload
     raise ValueError("No config_file provided.")
+
+
+def _read_form_values(handler: BaseHTTPRequestHandler) -> dict[str, list[str]]:
+    length = int(handler.headers.get("Content-Length", "0"))
+    data = handler.rfile.read(length).decode("utf-8")
+    return urllib.parse.parse_qs(data)
+
+
+def _get_text(values: dict[str, list[str]], key: str, default: str = "") -> str:
+    return (values.get(key, [default])[0] or "").strip()
+
+
+def _format_scopes(scopes: list[str]) -> str:
+    return ", ".join(scopes)
+
+
+def _dropbox_authorize_url(app_key: str, app_secret: str) -> str:
+    try:
+        from dropbox import DropboxOAuth2FlowNoRedirect
+    except Exception as exc:
+        raise RuntimeError("Dropbox SDK not available.") from exc
+    flow = DropboxOAuth2FlowNoRedirect(
+        app_key,
+        app_secret,
+        token_access_type="offline",
+        scope=DROPBOX_OAUTH_SCOPES,
+    )
+    return flow.start()
+
+
+def _dropbox_finish_auth(app_key: str, app_secret: str, auth_code: str) -> str:
+    try:
+        from dropbox import DropboxOAuth2FlowNoRedirect
+    except Exception as exc:
+        raise RuntimeError("Dropbox SDK not available.") from exc
+    flow = DropboxOAuth2FlowNoRedirect(
+        app_key,
+        app_secret,
+        token_access_type="offline",
+        scope=DROPBOX_OAUTH_SCOPES,
+    )
+    oauth_result = flow.finish(auth_code)
+    if not oauth_result.refresh_token:
+        raise RuntimeError(
+            "Dropbox did not return a refresh token. Ensure short-lived tokens are enabled."
+        )
+    return oauth_result.refresh_token
+
+
+def _render_dropbox_auth(app_key: str, app_secret: str, authorize_url: str) -> str:
+    safe_url = html.escape(authorize_url, quote=True)
+    scopes = html.escape(_format_scopes(DROPBOX_OAUTH_SCOPES), quote=True)
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dropbox Authorization</title>
+  <style>
+    body {{
+      margin: 0;
+      padding: 32px;
+      font-family: "SF Pro Text", "Helvetica Neue", "Avenir Next", sans-serif;
+      background: #f4f0e6;
+      color: #1a1a18;
+    }}
+    .card {{
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 28px;
+      border-radius: 16px;
+      background: #ffffff;
+      border: 1px solid #e0d6c1;
+      box-shadow: 0 18px 36px rgba(24, 24, 24, 0.18);
+    }}
+    h1 {{
+      margin-top: 0;
+      font-size: 24px;
+    }}
+    a {{
+      color: #8b5a1a;
+      font-weight: 600;
+      text-decoration: none;
+    }}
+    a:hover {{
+      text-decoration: underline;
+    }}
+    label {{
+      display: block;
+      margin-top: 16px;
+      font-weight: 600;
+    }}
+    input {{
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #dbcaa9;
+      margin-top: 6px;
+    }}
+    button {{
+      margin-top: 18px;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 10px;
+      background: #e3c07a;
+      cursor: pointer;
+      font-weight: 600;
+    }}
+    .note {{
+      margin-top: 10px;
+      font-size: 12px;
+      color: #6e6a61;
+    }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Dropbox authorization</h1>
+    <ol>
+      <li>Open this URL in a browser and approve access:</li>
+    </ol>
+    <p><a href="{safe_url}" target="_blank" rel="noopener">{safe_url}</a></p>
+    <p class="note">Scopes requested: {scopes}</p>
+    <form method="post" action="/dropbox-finish">
+      <input type="hidden" name="dropbox_app_key" value="{html.escape(app_key, quote=True)}">
+      <input type="hidden" name="dropbox_app_secret" value="{html.escape(app_secret, quote=True)}">
+      <label for="auth_code">Authorization code</label>
+      <input id="auth_code" name="auth_code" autocomplete="off">
+      <button type="submit">Save refresh token</button>
+    </form>
+    <p class="note"><a href="/">Back to settings</a></p>
+  </div>
+</body>
+</html>
+"""
 
 
 def _render_error(message: str) -> str:

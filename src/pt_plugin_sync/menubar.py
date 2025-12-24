@@ -91,6 +91,9 @@ class MenuBarApp(rumps.App):
             "Open Reports Folder", callback=self._on_open_reports_folder
         )
         self._settings_item = rumps.MenuItem("Settings...", callback=self._on_open_settings)
+        self._dropbox_auth_item = rumps.MenuItem(
+            "Authorize Dropbox...", callback=self._on_authorize_dropbox
+        )
         self._edit_config_item = rumps.MenuItem("Edit Config File...", callback=self._on_edit_config)
         self._reload_config_item = rumps.MenuItem(
             "Reload Config", callback=self._on_reload_config
@@ -116,6 +119,7 @@ class MenuBarApp(rumps.App):
             self._open_reports_item,
             None,
             self._settings_item,
+            self._dropbox_auth_item,
             self._edit_config_item,
             self._reload_config_item,
             self._updates_item,
@@ -277,19 +281,39 @@ class MenuBarApp(rumps.App):
     def _on_open_settings(self, _sender=None) -> None:
         if not CONFIG_PATH.exists():
             write_config(default_config())
+        server = self._ensure_settings_server()
+        if not server:
+            return
+        if server.is_running():
+            if server.url:
+                _open_path(server.url)
+            return
+        url = server.start()
+        _open_path(url)
+
+    def _on_authorize_dropbox(self, _sender=None) -> None:
+        if not self.config.dropbox_app_key or not self.config.dropbox_app_secret:
+            rumps.alert(
+                "Dropbox setup",
+                "Enter the Dropbox app key and secret in Settings first.",
+            )
+            self._on_open_settings()
+            return
+        server = self._ensure_settings_server()
+        if not server:
+            return
+        url = server.dropbox_auth_url()
+        _open_path(url)
+
+    def _ensure_settings_server(self):
         if self._settings_server is None:
             try:
                 from .settings_server import SettingsServer
             except Exception as exc:
                 rumps.alert("Settings unavailable", str(exc))
-                return
+                return None
             self._settings_server = SettingsServer(self.config, self._apply_settings)
-        if self._settings_server and self._settings_server.is_running():
-            if self._settings_server.url:
-                _open_path(self._settings_server.url)
-            return
-        url = self._settings_server.start()
-        _open_path(url)
+        return self._settings_server
 
     def _on_edit_config(self, _sender=None) -> None:
         if not CONFIG_PATH.exists():

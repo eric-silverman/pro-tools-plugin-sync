@@ -16,9 +16,19 @@ fi
 source "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip
 python -m pip install pyinstaller
+python -m pip install build
 python -m pip install -e .
 
 APP_NAME="Pro Tools Plugin Sync"
+CLI_WHEEL_DIR="dist/cli-wheel"
+
+rm -rf "$CLI_WHEEL_DIR"
+python -m build --wheel --outdir "$CLI_WHEEL_DIR"
+CLI_WHEEL_PATH="$(ls "$CLI_WHEEL_DIR"/pt_plugin_sync-*.whl | head -n 1)"
+if [[ -z "$CLI_WHEEL_PATH" ]]; then
+  echo "Failed to build CLI wheel."
+  exit 1
+fi
 
 python -m PyInstaller \
   --noconfirm \
@@ -38,7 +48,33 @@ DMG_RW="dist/pro-tools-plugin-sync-rw.dmg"
 rm -rf "$DMG_ROOT"
 mkdir -p "$DMG_ROOT"
 cp -R "dist/$APP_NAME.app" "$DMG_ROOT/"
+cp "$CLI_WHEEL_PATH" "$DMG_ROOT/"
 ln -s /Applications "$DMG_ROOT/Applications"
+cat > "$DMG_ROOT/Install CLI.command" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WHEEL_PATH="$(ls "$SCRIPT_DIR"/pt_plugin_sync-*.whl | head -n 1)"
+if [[ -z "$WHEEL_PATH" ]]; then
+  echo "Couldn't find the CLI wheel next to this script."
+  exit 1
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required to install the CLI."
+  exit 1
+fi
+VENV_DIR="$HOME/.pt-plugin-sync-cli"
+if [[ ! -d "$VENV_DIR" ]]; then
+  python3 -m venv "$VENV_DIR"
+fi
+source "$VENV_DIR/bin/activate"
+python -m pip install --upgrade pip
+python -m pip install "$WHEEL_PATH"
+echo "CLI installed."
+echo "Activate with: source \"$VENV_DIR/bin/activate\""
+echo "Then run: pt-plugin-sync --help"
+EOF
+chmod +x "$DMG_ROOT/Install CLI.command"
 cat > "$DMG_ROOT/Fix Gatekeeper.command" <<'EOF'
 #!/bin/bash
 set -euo pipefail
@@ -55,14 +91,32 @@ chmod +x "$DMG_ROOT/Fix Gatekeeper.command"
 cat > "$DMG_ROOT/README.txt" <<'EOF'
 Pro Tools Plugin Sync — Install & Setup (macOS)
 
-Install:
+What’s in this DMG
+- “Pro Tools Plugin Sync.app” (menu bar app)
+  - Recommended for most users.
+  - Runs in the menu bar, watches plug-ins, and can scan on a schedule.
+  - Includes Settings UI, update checks, and “Start at Login”.
+- “Install CLI.command” (optional command-line tool)
+  - Installs the `pt-plugin-sync` CLI into a local virtualenv.
+  - Useful for scripted scans, automation, or headless setups.
+  - The CLI and the app share the same config file.
+
+Install the app (recommended)
 1) Drag “Pro Tools Plugin Sync.app” into Applications.
 2) Launch it from Applications.
 3) If macOS says the app is damaged or blocked:
    - Control-click the app and choose “Open”, then confirm.
    - Or run “Fix Gatekeeper.command” after copying the app to Applications.
 
-First-time setup:
+Install the CLI (optional)
+1) Double-click “Install CLI.command”.
+2) Activate the CLI:
+   source ~/.pt-plugin-sync-cli/bin/activate
+3) Confirm it works:
+   pt-plugin-sync --help
+
+First-time setup (app or CLI)
+App setup:
 1) Click the menu bar icon and choose “Settings...”.
 2) Plug-ins folder: accept the default or browse to your AAX plug-ins.
    Default: ~/Library/Application Support/Avid/Audio/Plug-Ins
@@ -70,9 +124,19 @@ First-time setup:
    Default: ~/Dropbox/Pro Tools Plugin Reports
 4) Machine name: choose a clear name (used in report filenames).
 5) Save, then choose “Scan Now” to generate the first report.
+   If you use Dropbox API access, enter the app key/secret and click
+   “Authorize Dropbox...” to generate the refresh token.
 
-Repeat setup on every machine using the same reports folder.
-Reports live at: ~/.config/pt-plugin-sync/config.toml
+CLI setup:
+1) Activate the CLI (see above) and run:
+   pt-plugin-sync setup
+2) Follow the prompts for plug-ins folder, reports folder, and machine name.
+3) Run a scan:
+   pt-plugin-sync scan
+
+Notes
+- Repeat setup on every machine using the same reports folder.
+- Config location: ~/.config/pt-plugin-sync/config.toml
 EOF
 
 hdiutil create \
