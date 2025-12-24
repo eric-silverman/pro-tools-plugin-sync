@@ -53,10 +53,26 @@ echo "Done! You can open Pro Tools Plugin Sync now."
 EOF
 chmod +x "$DMG_ROOT/Fix Gatekeeper.command"
 cat > "$DMG_ROOT/README.txt" <<'EOF'
-If macOS says the app is damaged, it was blocked by Gatekeeper.
+Pro Tools Plugin Sync — Install & Setup (macOS)
+
+Install:
 1) Drag “Pro Tools Plugin Sync.app” into Applications.
-2) Double-click “Fix Gatekeeper.command”.
-That’s it — the app should open normally now.
+2) Launch it from Applications.
+3) If macOS says the app is damaged or blocked:
+   - Control-click the app and choose “Open”, then confirm.
+   - Or run “Fix Gatekeeper.command” after copying the app to Applications.
+
+First-time setup:
+1) Click the menu bar icon and choose “Settings...”.
+2) Plug-ins folder: accept the default or browse to your AAX plug-ins.
+   Default: ~/Library/Application Support/Avid/Audio/Plug-Ins
+3) Reports folder: pick a shared folder used by all machines.
+   Default: ~/Dropbox/Pro Tools Plugin Reports
+4) Machine name: choose a clear name (used in report filenames).
+5) Save, then choose “Scan Now” to generate the first report.
+
+Repeat setup on every machine using the same reports folder.
+Reports live at: ~/.config/pt-plugin-sync/config.toml
 EOF
 
 hdiutil create \

@@ -6,7 +6,16 @@ Sync and compare Pro Tools AAX plugin versions across machines by writing report
 - Python 3.11+
 - Access to the Pro Tools plug-ins folder
 
-## Install
+## Installation (macOS app via DMG)
+1) Download the latest DMG release.
+2) Open the DMG and drag `Pro Tools Plugin Sync.app` into `Applications`.
+3) Launch the app from `Applications`.
+4) If macOS says the app is damaged or blocked:
+   - Control-click the app in `Applications`, choose “Open”, then confirm.
+   - Or run `Fix Gatekeeper.command` from the DMG after copying the app to `Applications`.
+5) When the menu bar icon appears, open `Settings...` to complete setup.
+
+## Installation (from source / CLI)
 ```bash
 python -m venv .venv
 source .venv/bin/activate
@@ -16,12 +25,37 @@ Or use the setup helper:
 ```bash
 ./scripts/setup.sh
 ```
+After install, confirm the CLI is available:
+```bash
+pt-plugin-sync --help
+```
+If the command is not found, ensure your virtualenv is active or run
+`python -m pt_plugin_sync.cli --help` from the project directory.
 
 ## Setup (first run)
+Decide on a shared reports folder before you begin:
+- Local/shared: a folder synced by Dropbox/iCloud/SMB between machines.
+- Dropbox API: a Dropbox app with API access (for headless or server-friendly access).
+
+You can configure via the menu bar app or the CLI. Both write `~/.config/pt-plugin-sync/config.toml`.
+
+### Menu bar app setup (DMG)
+1) Click the menu bar icon and choose `Settings...`.
+2) Confirm or change the plug-ins folder (default: `~/Library/Application Support/Avid/Audio/Plug-Ins`).
+3) Choose the reports folder (default: `~/Dropbox/Pro Tools Plugin Reports`).
+4) Confirm the machine name (used in report filenames).
+5) Click Save, then choose `Scan Now` to verify the first report.
+
+### CLI setup
 Run interactive setup:
 ```bash
 pt-plugin-sync setup
 ```
+You will be prompted for:
+- Plug-ins folder (press Enter for the default).
+- Reports folder (must be shared with other machines).
+- Machine name (used in report filenames).
+- Reports backend (local filesystem or Dropbox API).
 
 Defaults:
 - Plugins: `~/Library/Application Support/Avid/Audio/Plug-Ins`
@@ -33,7 +67,7 @@ pt-plugin-sync setup --yes
 pt-plugin-sync setup --plugins-path "/path/to/Plug-Ins" --reports-path "/path/to/Reports" --machine-name "STUDIO-MAC" --non-interactive
 ```
 
-Dropbox API setup (headless refresh):
+### Dropbox API setup (headless refresh)
 1) Create an app in the [Dropbox Developer Console](https://www.dropbox.com/developers/apps)
 2) Click "Create app", choose "Scoped access", then choose either "App folder" or "Full Dropbox".
 3) In the app's settings, enable "Short-lived access tokens" and save.
@@ -55,6 +89,13 @@ Optional config keys:
 - `hash_binaries` (default `false`) to hash plugin binaries for stricter comparisons.
 - `prune_days` (default `0`) to delete timestamped reports older than N days.
 - `reports_backend` (`local` or `dropbox`) to control where reports live.
+
+### Verify setup across machines
+1) On the first machine, run `Scan Now` (menu bar) or `pt-plugin-sync scan`.
+2) Open the reports folder and confirm you see `<machine_name>__latest.json`.
+3) Repeat setup on the second machine, pointing at the same reports folder.
+4) Run another scan and confirm `diff__latest.json` and `summary__latest.json` are updated.
+5) If updates are needed, open the generated `updates__<machine>__latest.html` report.
 
 ## Run once
 ```bash
