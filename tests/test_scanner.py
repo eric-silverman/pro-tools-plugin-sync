@@ -44,3 +44,9 @@ def test_scan_plugins_hashes_binaries() -> None:
     plugins = scan_plugins(_fixtures_path(), hash_binaries=True)
     hashes = [plugin.binary_hash for plugin in plugins]
     assert all(value for value in hashes)
+
+
+def test_scan_plugins_returns_empty_for_missing_path(tmp_path) -> None:
+    missing = tmp_path / "missing"
+    plugins = scan_plugins(missing, hash_binaries=False)
+    assert plugins == []

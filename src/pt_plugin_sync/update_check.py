@@ -29,7 +29,7 @@ def current_version() -> str:
 
 
 def _parse_version(text: str) -> tuple[int, int, int]:
-    match = re.search(r"(\\d+)\\.(\\d+)\\.(\\d+)", text)
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", text)
     if not match:
         return (0, 0, 0)
     return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
