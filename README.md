@@ -45,7 +45,7 @@ You can configure via the menu bar app or the CLI. Both write `~/.config/pt-plug
 
 ### Menu bar app setup (DMG)
 1) Click the menu bar icon and choose `Settings...`.
-2) Confirm or change the plug-ins folder (default: `~/Library/Application Support/Avid/Audio/Plug-Ins`).
+2) Confirm or change the plug-ins folder (default: `/Library/Application Support/Avid/Audio/Plug-Ins`).
 3) Choose the reports folder (default: `~/Dropbox/Pro Tools Plugin Reports`).
 4) Confirm the machine name (used in report filenames).
 5) If using Dropbox API access, enter the app key/secret and click `Authorize Dropbox...`.
@@ -63,7 +63,7 @@ You will be prompted for:
 - Reports backend (local filesystem or Dropbox API).
 
 Defaults:
-- Plugins: `~/Library/Application Support/Avid/Audio/Plug-Ins`
+- Plugins: `/Library/Application Support/Avid/Audio/Plug-Ins`
 - Reports: `~/Dropbox/Pro Tools Plugin Reports`
 
 Non-interactive:

@@ -63,23 +63,34 @@ class MenuState:
     UPDATES = "updates"
 
 
+class ReleaseState:
+    UNKNOWN = "unknown"
+    UP_TO_DATE = "up_to_date"
+    UPDATE_AVAILABLE = "update_available"
+
+
 class MenuBarApp(rumps.App):
     def __init__(self, config: Config) -> None:
         super().__init__("PT", quit_button=None)
         self.config = config
         self._icon_assets = IconAssets()
         self._state = MenuState.IDLE
+        self._release_state = ReleaseState.UNKNOWN
         self._scan_lock = threading.Lock()
         self._pending_scan = False
         self._last_summary: dict | None = None
         self._last_update_count = 0
         self._last_report_path: pathlib.Path | None = None
+        self._current_version = current_version()
+        self._latest_release_version: str | None = None
         self._observer = None
         self._debouncer: DebouncedRunner | None = None
         self._timer: rumps.Timer | None = None
         self._settings_server = None
 
         self._status_item = rumps.MenuItem("Status: Idle")
+        self._version_item = rumps.MenuItem(f"App Version: {self._current_version}")
+        self._release_item = rumps.MenuItem("Release: Checking...")
         self._scan_item = rumps.MenuItem("Scan Now", callback=self._on_scan)
         self._open_report_item = rumps.MenuItem(
             "Open Update Report", callback=self._on_open_report
@@ -112,6 +123,8 @@ class MenuBarApp(rumps.App):
 
         self.menu = [
             self._status_item,
+            self._version_item,
+            self._release_item,
             None,
             self._scan_item,
             self._open_report_item,
@@ -131,6 +144,7 @@ class MenuBarApp(rumps.App):
         ]
 
         self._apply_state(MenuState.IDLE)
+        self._update_release_items()
         self._update_start_login_item()
         self._update_auto_update_item()
         self._setup_timer()
@@ -193,6 +207,17 @@ class MenuBarApp(rumps.App):
         if icon:
             self.icon = icon
             self.template = True
+
+    def _update_release_items(self) -> None:
+        current = self._current_version
+        if self._release_state == ReleaseState.UPDATE_AVAILABLE:
+            latest = self._latest_release_version or "unknown"
+            self._release_item.title = f"Release: Update Available (v{latest})"
+        elif self._release_state == ReleaseState.UP_TO_DATE:
+            self._release_item.title = f"Release: Up to date (v{current})"
+        else:
+            self._release_item.title = "Release: Checking..."
+        self._version_item.title = f"App Version: {current}"
 
     def _update_start_login_item(self) -> None:
         self._start_login_item.state = 1 if is_menubar_launchagent_installed() else 0
@@ -410,14 +435,25 @@ class MenuBarApp(rumps.App):
         try:
             release = latest_release()
             if not release:
+                self._release_state = ReleaseState.UNKNOWN
+                self._latest_release_version = None
+                self._update_release_items()
                 if show_no_updates:
                     rumps.alert("Update check failed", "No release information available.")
                 return
             current = current_version()
             if not is_update_available(current, release.version):
+                self._current_version = current
+                self._latest_release_version = release.version
+                self._release_state = ReleaseState.UP_TO_DATE
+                self._update_release_items()
                 if show_no_updates:
                     rumps.alert("Up to date", f"Version {current} is current.")
                 return
+            self._current_version = current
+            self._latest_release_version = release.version
+            self._release_state = ReleaseState.UPDATE_AVAILABLE
+            self._update_release_items()
             message = f"Version {release.version} is available (you have {current})."
             notes = _format_release_notes(release.notes)
             if notes:
@@ -437,6 +473,9 @@ class MenuBarApp(rumps.App):
                 elif release.url:
                     _open_path(release.url)
         except Exception as exc:
+            self._release_state = ReleaseState.UNKNOWN
+            self._latest_release_version = None
+            self._update_release_items()
             if show_no_updates:
                 rumps.alert("Update check failed", str(exc))
 

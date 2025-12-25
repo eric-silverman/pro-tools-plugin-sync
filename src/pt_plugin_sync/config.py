@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover - Python <3.11
 CONFIG_DIR = pathlib.Path("~/.config/pt-plugin-sync").expanduser()
 CONFIG_PATH = CONFIG_DIR / "config.toml"
 
-DEFAULT_PLUGINS_PATH = "~/Library/Application Support/Avid/Audio/Plug-Ins"
+DEFAULT_PLUGINS_PATH = "/Library/Application Support/Avid/Audio/Plug-Ins"
 DEFAULT_REPORTS_PATH = "~/Dropbox/Pro Tools Plugin Reports"
 DEFAULT_REPORTS_BACKEND = "local"
 DEFAULT_DROPBOX_REPORTS_PATH = "/Pro Tools Plugin Reports"

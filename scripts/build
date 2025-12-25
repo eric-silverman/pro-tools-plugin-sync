@@ -123,7 +123,7 @@ First-time setup (app or CLI)
 App setup:
 1) Click the menu bar icon and choose “Settings...”.
 2) Plug-ins folder: accept the default or browse to your AAX plug-ins.
-   Default: ~/Library/Application Support/Avid/Audio/Plug-Ins
+   Default: /Library/Application Support/Avid/Audio/Plug-Ins
 3) Reports folder: pick a shared folder used by all machines.
    Default: ~/Dropbox/Pro Tools Plugin Reports
 4) Machine name: choose a clear name (used in report filenames).

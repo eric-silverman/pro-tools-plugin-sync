@@ -12,7 +12,12 @@ def _fixtures_path() -> pathlib.Path:
 def test_scan_plugins_reads_metadata() -> None:
     plugins = scan_plugins(_fixtures_path(), hash_binaries=False)
     names = [plugin.bundle_name for plugin in plugins]
-    assert names == ["Alpha.aaxplugin", "Beta.aaxplugin", "Gamma.aaxplugin"]
+    assert names == [
+        "Alpha.aaxplugin",
+        "Beta.aaxplugin",
+        "Betazz.aaxplugin",
+        "Gamma.aaxplugin",
+    ]
 
     alpha = plugins[0]
     assert alpha.bundle_id == "com.example.alpha"
@@ -24,7 +29,12 @@ def test_scan_plugins_reads_metadata() -> None:
     assert beta.short_version is None
     assert beta.bundle_version == "200"
 
-    gamma = plugins[2]
+    betazz = plugins[2]
+    assert betazz.bundle_id == "com.example.beta"
+    assert betazz.short_version is None
+    assert betazz.bundle_version == "200"
+
+    gamma = plugins[3]
     assert gamma.bundle_id == "com.example.gamma"
     assert gamma.short_version == "2.0.0"
     assert gamma.bundle_version == "2000"

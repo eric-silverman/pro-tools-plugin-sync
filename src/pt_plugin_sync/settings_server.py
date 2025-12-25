@@ -663,6 +663,7 @@ def _finalize_save(updated: Config, server: SettingsServer) -> str | None:
     validation = validate_config(updated)
     if not validation.ok:
         return "\n".join(validation.errors)
+    server._config = updated
     write_config(updated)
     server._on_save(updated)
     return None
