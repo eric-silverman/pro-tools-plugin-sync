@@ -96,21 +96,26 @@ Optional config keys:
 - `hash_binaries` (default `false`) to hash plugin binaries for stricter comparisons.
 - `prune_days` (default `0`) to delete timestamped reports older than N days.
 - `reports_backend` (`local` or `dropbox`) to control where reports live.
+- `dropbox_reports_path` to set the Dropbox reports folder path.
+- `scan_interval_seconds` (default `3600`) to control how often the daemon/menu bar app scans.
+- `debounce_seconds` (default `15`) to debounce filesystem change scans.
+- `auto_update_download` (default `false`) to auto-download/install app updates.
 
 ### Verify setup across machines
 1) On the first machine, run `Scan Now` (menu bar) or `pt-plugin-sync scan`.
 2) Open the reports folder and confirm you see `<machine_name>__latest.json`.
 3) Repeat setup on the second machine, pointing at the same reports folder.
 4) Run another scan and confirm `diff__latest.json` and `summary__latest.json` are updated.
-5) If updates are needed, open the generated `updates__<machine>__latest.html` report.
+5) If updates are needed, open the generated `report__latest.html` combined report.
 
 ## Run once
 ```bash
 pt-plugin-sync scan
 ```
 This writes a timestamped report and `<machine_name>__latest.json`, generates `diff__latest.json`,
-and creates `summary__latest.json` plus an `updates__<machine>__latest.html` report for any machine
-that needs updates. The HTML report opens automatically on the machine that just scanned.
+creates `summary__latest.json`, and writes `report__latest.html` plus `report__latest.json`.
+The combined HTML opens automatically when updates are needed. Older timestamped scans are archived
+under `old scans/` (local or Dropbox).
 
 ## Run as a daemon
 ```bash
@@ -125,7 +130,8 @@ pt-plugin-sync menubar
 The menu bar app watches the plug-ins folder, runs periodic scans, and updates its icon
 when a scan is in progress or updates are needed. Use the “Start at Login” menu item
 to auto-launch on sign-in.
-Use “Check for Updates…” in the menu to download the latest release.
+Use “Check for Updates…” in the menu to download the latest release, or enable
+“Install Updates Automatically” to auto-apply updates.
 
 ## Install LaunchAgent
 ```bash
@@ -156,7 +162,7 @@ pt-plugin-sync uninstall-launchagent
 - If watching is unavailable, the daemon falls back to periodic scans.
 - Ensure the reports folder is shared between machines (Dropbox or similar).
 - If the plug-ins folder is unreadable, the scan skips files and continues.
-- If you want to preview the update report layout, open `docs/example_update_report.html`.
+- If you want to preview the combined report layout, open `docs/example_combined_report.html`.
 
 ## Development
 Run tests with:
