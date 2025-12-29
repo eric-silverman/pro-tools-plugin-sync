@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plugin Sync Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3f1ea;
+      --card: #ffffff;
+      --ink: #1e2426;
+      --muted: #5b6a70;
+      --accent: #2f6b5c;
+      --border: #e1ddd4;
+      --shadow: rgba(25, 33, 38, 0.08);
+      --missing: #d86c57;
+      --mismatch: #d7a12f;
+      --unknown: #5b73b5;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background: radial-gradient(circle at top, #fff6e5, #f3f1ea 60%);
+      color: var(--ink);
+    }
+    .page {
+      max-width: 1200px;
+      margin: 40px auto 60px;
+      padding: 0 24px;
+    }
+    .header {
+      padding: 24px;
+      border-radius: 22px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      box-shadow: 0 14px 32px var(--shadow);
+      animation: rise 0.6s ease-out;
+    }
+    .headline {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 28px;
+    }
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .summary-card {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: #fbfaf7;
+      border: 1px solid var(--border);
+    }
+    .summary-card h3 {
+      margin: 0 0 6px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .summary-card p {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .machine-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .machine-card {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #f7f5ef;
+      border: 1px dashed var(--border);
+    }
+    .machine-card h4 {
+      margin: 0 0 6px;
+      font-size: 14px;
+    }
+    .machine-card p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .filters {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+    }
+    .toggle {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: #f2f6f2;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .filter-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .section {
+      margin-top: 28px;
+      background: var(--card);
+      border-radius: 20px;
+      padding: 16px 18px;
+      border: 1px solid var(--border);
+      box-shadow: 0 12px 26px var(--shadow);
+    }
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin: 0 0 12px;
+    }
+    .section-title h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .table-wrap {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    thead th {
+      text-align: left;
+      padding: 12px 10px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--card);
+    }
+    tbody td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .plugin {
+      font-weight: 600;
+    }
+    .status {
+      min-width: 180px;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: #edf3ef;
+      color: var(--accent);
+      margin: 0 6px 6px 0;
+    }
+    .tag-missing {
+      background: rgba(216, 108, 87, 0.14);
+      color: var(--missing);
+    }
+    .tag-mismatch {
+      background: rgba(215, 161, 47, 0.16);
+      color: #9a6b05;
+    }
+    .tag-unknown {
+      background: rgba(91, 115, 181, 0.16);
+      color: var(--unknown);
+    }
+    .cell {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #f1f3f4;
+      color: #2b3235;
+    }
+    .cell-missing {
+      background: rgba(216, 108, 87, 0.16);
+      color: var(--missing);
+    }
+    .cell-unknown {
+      background: rgba(91, 115, 181, 0.16);
+      color: var(--unknown);
+    }
+    .machine-select {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    select {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      background: #fff;
+    }
+    .footer {
+      margin-top: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(18px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    @media (max-width: 720px) {
+      .headline {
+        flex-direction: column;
+      }
+      .summary {
+        justify-content: flex-start;
+      }
+      .status {
+        min-width: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="header">
+      <div class="headline">
+        <div>
+          <h1>Plugin Sync Report</h1>
+          <p class="subtitle">Generated 2025-01-15 14:22 · 2 machines</p>
+        </div>
+        <div class="summary">
+          <div class="summary-card">
+            <h3>Total Plugins</h3>
+            <p>5</p>
+          </div>
+          <div class="summary-card">
+            <h3>Differences</h3>
+            <p>4</p>
+          </div>
+          <div class="summary-card">
+            <h3>Missing</h3>
+            <p>2</p>
+          </div>
+          <div class="summary-card">
+            <h3>Version Mismatches</h3>
+            <p>1</p>
+          </div>
+          <div class="summary-card">
+            <h3>Unknown Versions</h3>
+            <p>1</p>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3>Machine snapshots</h3>
+        <div class="machine-grid">
+          <div class="machine-card">
+            <h4>Studio-Mac</h4>
+            <p>Last scan: 2025-01-15 14:20</p>
+          </div>
+          <div class="machine-card">
+            <h4>Travel-Mac</h4>
+            <p>Last scan: 2025-01-15 14:18</p>
+          </div>
+        </div>
+      </div>
+      <div class="filters">
+        <label class="toggle">
+          <input type="checkbox" id="show-all">
+          Show all plugins
+        </label>
+        <div class="filter-group">
+          <label class="toggle">
+            <input type="checkbox" id="filter-missing" checked>
+            Missing
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="filter-mismatch" checked>
+            Version mismatch
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="filter-unknown" checked>
+            Unknown version
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <h2>Update Plan</h2>
+        <div class="machine-select">
+          <span>Machine</span>
+          <select id="machine-select">
+            <option value="Studio-Mac" selected>Studio-Mac (1)</option>
+            <option value="Travel-Mac">Travel-Mac (2)</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Plugin</th>
+              <th>Current</th>
+              <th>Latest</th>
+              <th>Reason</th>
+              <th>Source</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="updates-table">
+            <tr>
+              <td>ReVibe II</td>
+              <td>Missing</td>
+              <td>2.1.0</td>
+              <td>Missing</td>
+              <td>Travel-Mac</td>
+              <td>Install</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <h2>Version Comparison</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Plugin</th>
+              <th>Status</th>
+              <th>Studio-Mac</th>
+              <th>Travel-Mac</th>
+            </tr>
+          </thead>
+          <tbody id="plugin-table">
+            <tr data-diff="false" data-missing="false" data-mismatch="false" data-unknown="false">
+              <td class="plugin">EQ III 7-Band</td>
+              <td class="status"><span class="tag">In sync</span></td>
+              <td><span class="cell cell-version">3.12.0</span></td>
+              <td><span class="cell cell-version">3.12.0</span></td>
+            </tr>
+            <tr data-diff="true" data-missing="true" data-mismatch="false" data-unknown="false">
+              <td class="plugin">ReVibe II</td>
+              <td class="status"><span class="tag tag-missing">Missing</span></td>
+              <td><span class="cell cell-missing">Missing</span></td>
+              <td><span class="cell cell-version">2.1.0</span></td>
+            </tr>
+            <tr data-diff="true" data-missing="false" data-mismatch="true" data-unknown="false">
+              <td class="plugin">Vintage Filter</td>
+              <td class="status"><span class="tag tag-mismatch">Version mismatch</span></td>
+              <td><span class="cell cell-version">1.2.0</span></td>
+              <td><span class="cell cell-version">1.1.0</span></td>
+            </tr>
+            <tr data-diff="true" data-missing="false" data-mismatch="false" data-unknown="true">
+              <td class="plugin">AIR Chorus</td>
+              <td class="status"><span class="tag tag-unknown">Unknown version</span></td>
+              <td><span class="cell cell-unknown">Unknown</span></td>
+              <td><span class="cell cell-version">1.0.0</span></td>
+            </tr>
+            <tr data-diff="true" data-missing="true" data-mismatch="false" data-unknown="false">
+              <td class="plugin">D-Verb</td>
+              <td class="status"><span class="tag tag-missing">Missing</span></td>
+              <td><span class="cell cell-version">3.0.0</span></td>
+              <td><span class="cell cell-missing">Missing</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="footer">pt-plugin-sync</div>
+  </div>
+  <script>
+    const showAll = document.getElementById("show-all");
+    const filterMissing = document.getElementById("filter-missing");
+    const filterMismatch = document.getElementById("filter-mismatch");
+    const filterUnknown = document.getElementById("filter-unknown");
+    const rows = Array.from(document.querySelectorAll("#plugin-table tr"));
+    const updatesByMachine = {
+      "Studio-Mac": `
+        <tr>
+          <td>ReVibe II</td>
+          <td>Missing</td>
+          <td>2.1.0</td>
+          <td>Missing</td>
+          <td>Travel-Mac</td>
+          <td>Install</td>
+        </tr>
+      `,
+      "Travel-Mac": `
+        <tr>
+          <td>D-Verb</td>
+          <td>Missing</td>
+          <td>3.0.0</td>
+          <td>Missing</td>
+          <td>Studio-Mac</td>
+          <td>Install</td>
+        </tr>
+        <tr>
+          <td>Vintage Filter</td>
+          <td>1.1.0</td>
+          <td>1.2.0</td>
+          <td>Version mismatch</td>
+          <td>Studio-Mac</td>
+          <td>Update</td>
+        </tr>
+      `
+    };
+    const machineSelect = document.getElementById("machine-select");
+    const updatesTable = document.getElementById("updates-table");
+
+    function applyFilters() {
+      const showAllChecked = showAll.checked;
+      const missingOn = filterMissing.checked;
+      const mismatchOn = filterMismatch.checked;
+      const unknownOn = filterUnknown.checked;
+
+      rows.forEach((row) => {
+        const isDiff = row.dataset.diff === "true";
+        const hasMissing = row.dataset.missing === "true";
+        const hasMismatch = row.dataset.mismatch === "true";
+        const hasUnknown = row.dataset.unknown === "true";
+
+        let visible = showAllChecked || isDiff;
+        if (visible) {
+          if (hasMissing && !missingOn) {
+            visible = false;
+          }
+          if (hasMismatch && !mismatchOn) {
+            visible = false;
+          }
+          if (hasUnknown && !unknownOn) {
+            visible = false;
+          }
+          if (!showAllChecked && !hasMissing && !hasMismatch && !hasUnknown) {
+            visible = false;
+          }
+        }
+        row.hidden = !visible;
+      });
+    }
+
+    function updateMachineTable() {
+      const key = machineSelect.value;
+      updatesTable.innerHTML = updatesByMachine[key] || "<tr><td colspan='6'>All up to date.</td></tr>";
+    }
+
+    [showAll, filterMissing, filterMismatch, filterUnknown].forEach((control) => {
+      control.addEventListener("change", applyFilters);
+    });
+    machineSelect.addEventListener("change", updateMachineTable);
+
+    applyFilters();
+    updateMachineTable();
+  </script>
+</body>
+</html>
