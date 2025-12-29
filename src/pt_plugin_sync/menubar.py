@@ -7,6 +7,7 @@ import threading
 import tempfile
 import sys
 import tempfile
+import urllib.parse
 from datetime import datetime
 from dataclasses import dataclass
 
@@ -316,10 +317,8 @@ class MenuBarApp(rumps.App):
 
     def _on_open_reports_folder(self, _sender=None) -> None:
         if self.config.reports_backend != "local":
-            rumps.alert(
-                "Reports in Dropbox",
-                "Open the Dropbox folder to view reports.",
-            )
+            url = _dropbox_reports_url(self.config.dropbox_reports_path)
+            _open_path(url)
             return
         reports_path = self.config.expanded_reports_path()
         _open_path(str(reports_path))
@@ -547,6 +546,21 @@ def _open_path(path: str, app: str | None = None) -> None:
         subprocess.run(["open", "-a", app, path], capture_output=True, text=True)
     else:
         subprocess.run(["open", path], capture_output=True, text=True)
+
+
+def _dropbox_reports_url(reports_path: str | None) -> str:
+    base_url = "https://www.dropbox.com/home"
+    if not reports_path:
+        return base_url
+    normalized = reports_path.strip()
+    if not normalized:
+        return base_url
+    if not normalized.startswith("/"):
+        normalized = f"/{normalized}"
+    if normalized != "/" and normalized.endswith("/"):
+        normalized = normalized.rstrip("/")
+    quoted = urllib.parse.quote(normalized, safe="/")
+    return f"{base_url}{quoted}"
 
 
 def _format_release_notes(notes: str) -> str:
