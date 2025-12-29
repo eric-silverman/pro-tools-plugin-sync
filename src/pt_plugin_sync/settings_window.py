@@ -177,7 +177,7 @@ class SettingsWindowController(NSObject):
         root.addArrangedSubview_(self._row("Prune reports (days)", "prune_days"))
         root.addArrangedSubview_(self._checkbox_row("Hash binaries", "hash_binaries"))
         root.addArrangedSubview_(
-            self._checkbox_row("Download updates automatically", "auto_update_download")
+            self._checkbox_row("Install updates automatically", "auto_update_download")
         )
 
         buttons = NSStackView.alloc().initWithFrame_(((0, 0), (520, 30)))

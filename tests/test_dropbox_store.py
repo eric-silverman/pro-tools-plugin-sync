@@ -47,6 +47,22 @@ def test_write_report_uploads_payload(monkeypatch, tmp_path) -> None:
     assert any(path.endswith("__latest.json") for path, _ in uploads)
 
 
+def test_write_combined_report_uploads_html_and_json() -> None:
+    uploads = []
+
+    class FakeClient:
+        def files_upload(self, data, path, mode=None):
+            uploads.append(path)
+
+    store = DropboxReportStore(client=FakeClient(), reports_path="/Reports")
+    reports = {"Studio": {"machine_name": "Studio", "plugins": []}}
+    summary = {"updates_by_machine": {"Studio": []}}
+    diff = {"generated_at": "2024-01-01T00:00:00Z"}
+    store.write_combined_report(reports, summary, diff)
+    assert any(path.endswith("report__latest.html") for path in uploads)
+    assert any(path.endswith("report__latest.json") for path in uploads)
+
+
 def test_dropbox_prune_reports_skips_when_disabled(monkeypatch) -> None:
     calls = []
 

@@ -1,12 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_submodules
+
+hiddenimports = []
+hiddenimports += collect_submodules('pt_plugin_sync')
 
 
 a = Analysis(
     ['src/pt_plugin_sync/menubar_app.py'],
-    pathex=[],
+    pathex=['src'],
     binaries=[],
-    datas=[('src/pt_plugin_sync/resources', 'pt_plugin_sync/resources')],
-    hiddenimports=[],
+    datas=[('src/pt_plugin_sync', 'pt_plugin_sync')],
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

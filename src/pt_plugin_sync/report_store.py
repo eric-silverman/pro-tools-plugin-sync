@@ -4,6 +4,7 @@ import pathlib
 from dataclasses import dataclass
 from typing import Protocol
 
+from .combined_report import write_combined_report as write_local_combined_report
 from .config import Config
 from .diffing import load_latest_reports as load_local_reports
 from .diffing import write_diff as write_local_diff
@@ -20,6 +21,9 @@ class ReportStore(Protocol):
         raise NotImplementedError
 
     def write_summary(self, summary: dict) -> None:
+        raise NotImplementedError
+
+    def write_combined_report(self, reports: dict[str, dict], summary: dict, diff: dict) -> None:
         raise NotImplementedError
 
     def load_latest_reports(self) -> dict[str, dict]:
@@ -41,6 +45,9 @@ class LocalReportStore:
 
     def write_summary(self, summary: dict) -> None:
         write_local_summary(self.reports_dir, summary)
+
+    def write_combined_report(self, reports: dict[str, dict], summary: dict, diff: dict) -> None:
+        write_local_combined_report(self.reports_dir, reports, summary, diff)
 
     def load_latest_reports(self) -> dict[str, dict]:
         return load_local_reports(self.reports_dir)

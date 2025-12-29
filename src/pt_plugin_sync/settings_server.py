@@ -503,7 +503,7 @@ def _render_form(config: Config, *, notice: str | None) -> str:
       </div>
         <div class="checkbox">
           <input id="auto_update_download" name="auto_update_download" type="checkbox" {auto_update_checked}>
-          <label for="auto_update_download">Download updates automatically</label>
+          <label for="auto_update_download">Install updates automatically</label>
         </div>
       </div>
 

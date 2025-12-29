@@ -50,3 +50,21 @@ def test_scan_plugins_returns_empty_for_missing_path(tmp_path) -> None:
     missing = tmp_path / "missing"
     plugins = scan_plugins(missing, hash_binaries=False)
     assert plugins == []
+
+
+def test_scan_plugins_raises_permission_error(monkeypatch, tmp_path) -> None:
+    target = tmp_path / "plugins"
+    target.mkdir()
+
+    monkeypatch.setattr("pt_plugin_sync.scanner.os.access", lambda _p, _m: False)
+
+    def fake_scandir(_path):
+        raise PermissionError("nope")
+
+    monkeypatch.setattr("pt_plugin_sync.scanner.os.scandir", fake_scandir)
+    try:
+        scan_plugins(target, hash_binaries=False)
+    except PermissionError as exc:
+        assert "Permission denied" in str(exc)
+    else:
+        raise AssertionError("Expected PermissionError")

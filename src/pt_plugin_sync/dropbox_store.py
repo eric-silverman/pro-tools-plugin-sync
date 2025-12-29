@@ -8,6 +8,7 @@ from typing import Iterable
 import dropbox
 from dropbox.files import WriteMode
 
+from .combined_report import COMBINED_HTML_LATEST_FILENAME, build_combined_report_payload
 from .config import Config
 from .report_naming import ARCHIVE_DIR_NAME, DIFF_FILENAME, SUMMARY_FILENAME, is_timestamped_report
 
@@ -66,6 +67,15 @@ class DropboxReportStore:
         payload = json.dumps(summary, indent=2, sort_keys=True) + "\n"
         self._upload_text(SUMMARY_FILENAME, payload, overwrite=True)
 
+    def write_combined_report(self, reports: dict[str, dict], summary: dict, diff: dict) -> None:
+        html_payload, json_payload, latest_html, latest_json = build_combined_report_payload(
+            reports,
+            summary,
+            diff,
+        )
+        self._upload_text(latest_html, html_payload, overwrite=True)
+        self._upload_text(latest_json, json_payload + "\n", overwrite=True)
+
     def load_latest_reports(self) -> dict[str, dict]:
         reports: dict[str, dict] = {}
         for entry in self._list_files_in(self.reports_path):
@@ -108,6 +118,17 @@ class DropboxReportStore:
             return json.loads(response.content.decode("utf-8"))
         except json.JSONDecodeError:
             return None
+
+    def _download_text(self, path: str) -> str | None:
+        _, response = self.client.files_download(path)
+        try:
+            return response.content.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+
+    def download_latest_report_html(self) -> str | None:
+        path = f"{self.reports_path}/{COMBINED_HTML_LATEST_FILENAME}"
+        return self._download_text(path)
 
     def _list_files_in(self, path: str) -> Iterable[dropbox.files.FileMetadata]:
         result = self.client.files_list_folder(path)

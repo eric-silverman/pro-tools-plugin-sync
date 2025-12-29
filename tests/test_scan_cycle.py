@@ -3,6 +3,10 @@ from __future__ import annotations
 import pathlib
 
 from pt_plugin_sync.config import Config
+from pt_plugin_sync.combined_report import (
+    COMBINED_HTML_LATEST_FILENAME,
+    COMBINED_JSON_LATEST_FILENAME,
+)
 from pt_plugin_sync.report_naming import DIFF_FILENAME, SUMMARY_FILENAME
 from pt_plugin_sync import scan_cycle as scan_cycle_module
 from pt_plugin_sync.scan_cycle import perform_scan
@@ -28,6 +32,8 @@ def test_perform_scan_writes_reports(tmp_path) -> None:
     assert latest.exists()
     assert (reports_dir / DIFF_FILENAME).exists()
     assert (reports_dir / SUMMARY_FILENAME).exists()
+    assert (reports_dir / COMBINED_HTML_LATEST_FILENAME).exists()
+    assert (reports_dir / COMBINED_JSON_LATEST_FILENAME).exists()
 
 
 def test_perform_scan_update_count(tmp_path) -> None:

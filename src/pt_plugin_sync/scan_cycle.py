@@ -8,7 +8,7 @@ from .diffing import compute_diff, compute_update_summary
 from .report_store import report_store_from_config
 from .reporting import build_report
 from .scanner import scan_plugins
-from .update_report import open_update_report_if_needed
+from .combined_report import COMBINED_HTML_LATEST_FILENAME, open_report as open_combined_report
 
 
 @dataclass
@@ -41,10 +41,15 @@ def perform_scan(config: Config, *, open_report: bool = True) -> ScanResult:
     store.write_diff(diff)
     summary = compute_update_summary(reports)
     store.write_summary(summary)
-    report_path = None
-    if open_report:
-        report_path = open_update_report_if_needed(config, summary)
     update_count = _count_updates(summary, config.machine_name)
+    store.write_combined_report(reports, summary, diff)
+    report_path = None
+    if config.reports_backend == "local":
+        latest = config.expanded_reports_path() / COMBINED_HTML_LATEST_FILENAME
+        if latest.exists():
+            report_path = latest
+            if open_report and update_count > 0:
+                open_combined_report(report_path)
     return ScanResult(
         diff=diff,
         summary=summary,

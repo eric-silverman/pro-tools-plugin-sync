@@ -5,6 +5,9 @@ import shutil
 import subprocess
 import threading
 import tempfile
+import sys
+import tempfile
+from datetime import datetime
 from dataclasses import dataclass
 
 import rumps
@@ -27,6 +30,8 @@ from .launchd import (
     LOG_DIR,
 )
 from .scan_cycle import perform_scan
+from .combined_report import COMBINED_HTML_LATEST_FILENAME
+from .auto_update import find_app_bundle, install_update
 from .update_check import current_version, is_update_available, latest_release
 
 @dataclass
@@ -81,23 +86,21 @@ class MenuBarApp(rumps.App):
         self._last_summary: dict | None = None
         self._last_update_count = 0
         self._last_report_path: pathlib.Path | None = None
+        self._last_scan_time: datetime | None = None
         self._current_version = current_version()
         self._latest_release_version: str | None = None
         self._observer = None
         self._debouncer: DebouncedRunner | None = None
         self._timer: rumps.Timer | None = None
         self._settings_server = None
+        self._report_temp_dir: tempfile.TemporaryDirectory | None = None
 
         self._status_item = rumps.MenuItem("Status: Idle")
+        self._last_scan_item = rumps.MenuItem("Last Scan: Never")
         self._version_item = rumps.MenuItem(f"App Version: {self._current_version}")
         self._release_item = rumps.MenuItem("Release: Checking...")
         self._scan_item = rumps.MenuItem("Scan Now", callback=self._on_scan)
-        self._open_report_item = rumps.MenuItem(
-            "Open Update Report", callback=self._on_open_report
-        )
-        self._open_latest_html_item = rumps.MenuItem(
-            "Open Latest HTML Report", callback=self._on_open_latest_html
-        )
+        self._open_report_item = rumps.MenuItem("Open Report", callback=self._on_open_report)
         self._open_reports_item = rumps.MenuItem(
             "Open Reports Folder", callback=self._on_open_reports_folder
         )
@@ -113,7 +116,7 @@ class MenuBarApp(rumps.App):
             "Check for Updates...", callback=self._on_check_updates
         )
         self._auto_update_item = rumps.MenuItem(
-            "Download Updates Automatically", callback=self._on_toggle_auto_update
+            "Install Updates Automatically", callback=self._on_toggle_auto_update
         )
         self._start_login_item = rumps.MenuItem(
             "Start at Login", callback=self._on_toggle_login
@@ -123,12 +126,12 @@ class MenuBarApp(rumps.App):
 
         self.menu = [
             self._status_item,
+            self._last_scan_item,
             self._version_item,
             self._release_item,
             None,
             self._scan_item,
             self._open_report_item,
-            self._open_latest_html_item,
             self._open_reports_item,
             None,
             self._settings_item,
@@ -219,6 +222,13 @@ class MenuBarApp(rumps.App):
             self._release_item.title = "Release: Checking..."
         self._version_item.title = f"App Version: {current}"
 
+    def _update_last_scan_item(self) -> None:
+        if self._last_scan_time is None:
+            self._last_scan_item.title = "Last Scan: Never"
+            return
+        stamp = self._last_scan_time.strftime("%Y-%m-%d %H:%M")
+        self._last_scan_item.title = f"Last Scan: {stamp}"
+
     def _update_start_login_item(self) -> None:
         self._start_login_item.state = 1 if is_menubar_launchagent_installed() else 0
 
@@ -243,13 +253,22 @@ class MenuBarApp(rumps.App):
             self._last_summary = result.summary
             self._last_update_count = result.update_count
             self._last_report_path = result.report_path
+            self._last_scan_time = datetime.now()
+            self._update_last_scan_item()
             if result.update_count > 0:
                 self._apply_state(MenuState.UPDATES)
             else:
                 self._apply_state(MenuState.IDLE)
         except Exception as exc:
             self._apply_state(MenuState.IDLE)
-            rumps.alert("Scan failed", str(exc))
+            self._last_scan_time = datetime.now()
+            self._update_last_scan_item()
+            if isinstance(exc, PermissionError) or (
+                isinstance(exc, OSError) and exc.errno in (1, 13)
+            ):
+                self._alert_scan_permissions()
+            else:
+                rumps.alert("Scan failed", str(exc))
         finally:
             self._scan_lock.release()
             if self._pending_scan:
@@ -258,25 +277,40 @@ class MenuBarApp(rumps.App):
 
     def _on_open_report(self, _sender=None) -> None:
         if self.config.reports_backend != "local":
-            rumps.alert(
-                "Reports in Dropbox",
-                "Open the Dropbox folder to view reports.",
-            )
+            try:
+                from .dropbox_store import DropboxReportStore
+            except Exception as exc:
+                rumps.alert("Dropbox unavailable", str(exc))
+                return
+            try:
+                store = DropboxReportStore.from_config(self.config)
+                html_payload = store.download_latest_report_html()
+            except Exception as exc:
+                rumps.alert("Report unavailable", str(exc))
+                return
+            if not html_payload:
+                rumps.alert("No report yet", "Run a scan first.")
+                return
+            if self._report_temp_dir is None:
+                self._report_temp_dir = tempfile.TemporaryDirectory()
+            target = pathlib.Path(self._report_temp_dir.name) / COMBINED_HTML_LATEST_FILENAME
+            target.write_text(html_payload, encoding="utf-8")
+            _open_path(str(target))
             return
-        latest = (
-            pathlib.Path(self.config.expanded_reports_path())
-            / f"updates__{self.config.machine_name.replace('/', '-')}__latest.html"
-        )
+        latest = self.config.expanded_reports_path() / COMBINED_HTML_LATEST_FILENAME
         if latest.exists():
             _open_path(str(latest))
             return
         if not self._last_summary:
-            rumps.alert("No update report yet", "Run a scan first.")
+            rumps.alert("No report yet", "Run a scan first.")
             return
         result = perform_scan(self.config, open_report=True)
         self._last_summary = result.summary
         self._last_update_count = result.update_count
         self._last_report_path = result.report_path
+        if result.report_path and result.report_path.exists():
+            _open_path(str(result.report_path))
+            return
         if result.update_count == 0:
             rumps.alert("No updates needed", "All plugins are up to date.")
 
@@ -289,19 +323,6 @@ class MenuBarApp(rumps.App):
             return
         reports_path = self.config.expanded_reports_path()
         _open_path(str(reports_path))
-
-    def _on_open_latest_html(self, _sender=None) -> None:
-        if self.config.reports_backend != "local":
-            rumps.alert(
-                "Reports in Dropbox",
-                "Open the Dropbox folder to view reports.",
-            )
-            return
-        latest = _latest_html_report(self.config.expanded_reports_path())
-        if latest is None:
-            rumps.alert("No HTML reports found", "Run a scan first.")
-            return
-        _open_path(str(latest))
 
     def _on_open_settings(self, _sender=None) -> None:
         if not CONFIG_PATH.exists():
@@ -400,6 +421,18 @@ class MenuBarApp(rumps.App):
         rumps.alert("Uninstalled", "Login items and settings removed.")
         self._on_quit()
 
+    def _alert_scan_permissions(self) -> None:
+        path = self.config.expanded_plugins_path()
+        rumps.alert(
+            "Scan blocked by permissions",
+            "The app cannot read your plug-ins folder.\n\n"
+            f"Folder: {path}\n\n"
+            "Fix options:\n"
+            "1) System Settings → Privacy & Security → Full Disk Access.\n"
+            "   Enable “Pro Tools Plugin Sync”, then relaunch the app.\n"
+            "2) Move the plug-ins folder out of Desktop/Documents and update Settings.",
+        )
+
 
     def _on_toggle_auto_update(self, _sender=None) -> None:
         updated = Config(
@@ -459,17 +492,17 @@ class MenuBarApp(rumps.App):
             if notes:
                 message += f"\n\nNotes:\n{notes}"
             if release.asset_url:
-                message += "\n\nDownload the latest installer?"
+                message += "\n\nInstall the latest update now?"
             if self.config.auto_update_download and release.asset_url:
-                _open_path(release.asset_url)
+                self._run_auto_update(release.asset_url)
                 return
             if release.asset_url:
-                prompt = rumps.alert("Update available", message, ok="Download", cancel="Later")
+                prompt = rumps.alert("Update available", message, ok="Install", cancel="Later")
             else:
                 prompt = rumps.alert("Update available", message, ok="Open Release", cancel="Later")
             if prompt == 1:
                 if release.asset_url:
-                    _open_path(release.asset_url)
+                    self._run_auto_update(release.asset_url)
                 elif release.url:
                     _open_path(release.url)
         except Exception as exc:
@@ -478,6 +511,19 @@ class MenuBarApp(rumps.App):
             self._update_release_items()
             if show_no_updates:
                 rumps.alert("Update check failed", str(exc))
+
+    def _run_auto_update(self, asset_url: str) -> None:
+        rumps.alert(
+            "Updating",
+            "Downloading and installing the latest version. The app will relaunch.",
+        )
+        bundle_path = find_app_bundle(sys.argv[0])
+        try:
+            install_update(asset_url, bundle_path)
+        except Exception as exc:
+            rumps.alert("Update failed", str(exc))
+            return
+        rumps.quit_application()
 
 
 def _ensure_config() -> Config:
@@ -514,12 +560,3 @@ def _format_release_notes(notes: str) -> str:
     if len(lines) > max_lines:
         trimmed.append("...")
     return "\n".join(trimmed)
-
-
-def _latest_html_report(reports_dir: pathlib.Path) -> pathlib.Path | None:
-    if not reports_dir.exists():
-        return None
-    candidates = list(reports_dir.glob("*.html"))
-    if not candidates:
-        return None
-    return max(candidates, key=lambda path: path.stat().st_mtime)

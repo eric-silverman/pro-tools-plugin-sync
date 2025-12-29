@@ -58,6 +58,7 @@ def _cmd_diff(_: argparse.Namespace) -> int:
     store.write_diff(diff)
     summary = compute_update_summary(reports)
     store.write_summary(summary)
+    store.write_combined_report(reports, summary, diff)
     print(format_diff_summary(diff))
     return 0
 

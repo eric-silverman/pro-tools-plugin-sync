@@ -41,7 +41,9 @@ python -m PyInstaller \
   --windowed \
   --name "$APP_NAME" \
   --icon "src/pt_plugin_sync/resources/app_icon.icns" \
-  --add-data "src/pt_plugin_sync/resources:pt_plugin_sync/resources" \
+  --paths "src" \
+  --collect-submodules "pt_plugin_sync" \
+  --add-data "src/pt_plugin_sync:pt_plugin_sync" \
   src/pt_plugin_sync/menubar_app.py
 
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "dist/$APP_NAME.app/Contents/Info.plist" 2>/dev/null \
