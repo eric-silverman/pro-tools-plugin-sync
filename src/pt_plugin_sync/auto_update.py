@@ -17,15 +17,36 @@ def find_app_bundle(executable_path: str) -> pathlib.Path | None:
     return None
 
 
-def download_dmg(url: str, target_dir: pathlib.Path) -> pathlib.Path:
-    target_dir.mkdir(parents=True, exist_ok=True)
+def _dmg_name(url: str) -> str:
     name = pathlib.Path(urllib.parse.urlparse(url).path).name or "pt-plugin-sync.dmg"
     if not name.endswith(".dmg"):
-        name = f"{name}.dmg"
-    target = target_dir / name
+        return f"{name}.dmg"
+    return name
+
+
+def _unique_path(target: pathlib.Path) -> pathlib.Path:
+    if not target.exists():
+        return target
+    stem = target.stem
+    suffix = target.suffix
+    for index in range(1, 1000):
+        candidate = target.with_name(f"{stem} ({index}){suffix}")
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError("Unable to find a unique filename for the download.")
+
+
+def download_dmg(url: str, target_dir: pathlib.Path) -> pathlib.Path:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = _unique_path(target_dir / _dmg_name(url))
     with urllib.request.urlopen(url, timeout=30) as response:
         target.write_bytes(response.read())
     return target
+
+
+def download_update(asset_url: str, target_dir: pathlib.Path | None = None) -> pathlib.Path:
+    downloads_dir = target_dir or pathlib.Path(os.path.expanduser("~/Downloads"))
+    return download_dmg(asset_url, downloads_dir)
 
 
 def mount_dmg(dmg_path: pathlib.Path) -> pathlib.Path:

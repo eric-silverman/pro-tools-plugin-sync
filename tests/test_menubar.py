@@ -351,11 +351,20 @@ def test_check_updates_auto_download(monkeypatch, tmp_path) -> None:
 
     monkeypatch.setattr(menubar_module, "latest_release", lambda: Release())
     opened = {}
+    download_calls = {}
 
     def fake_open(path, app=None):
         opened["path"] = path
 
     monkeypatch.setattr(menubar_module, "_open_path", fake_open)
+    download_path = tmp_path / "Downloads" / "Update.dmg"
+
+    def fake_download(asset_url, target_dir=None):
+        download_calls["asset_url"] = asset_url
+        download_calls["target_dir"] = target_dir
+        return download_path
+
+    monkeypatch.setattr(menubar_module, "download_update", fake_download)
     reports_dir = tmp_path / "reports"
     reports_dir.mkdir()
     plugins_dir = tmp_path / "plugins"
@@ -369,7 +378,8 @@ def test_check_updates_auto_download(monkeypatch, tmp_path) -> None:
     )
     app = menubar_module.MenuBarApp(config)
     app._check_updates(show_no_updates=False)
-    assert opened["path"] == "http://example.com/asset"
+    assert download_calls["asset_url"] == "http://example.com/asset"
+    assert opened["path"] == str(download_path.parent)
 
 
 def test_check_updates_up_to_date_alerts(monkeypatch, tmp_path) -> None:

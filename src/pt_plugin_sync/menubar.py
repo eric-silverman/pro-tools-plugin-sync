@@ -5,7 +5,6 @@ import shutil
 import subprocess
 import threading
 import tempfile
-import sys
 import tempfile
 import urllib.parse
 from datetime import datetime
@@ -32,7 +31,7 @@ from .launchd import (
 )
 from .scan_cycle import perform_scan
 from .combined_report import COMBINED_HTML_LATEST_FILENAME
-from .auto_update import find_app_bundle, install_update
+from .auto_update import download_update
 from .update_check import current_version, is_update_available, latest_release
 
 @dataclass
@@ -117,7 +116,7 @@ class MenuBarApp(rumps.App):
             "Check for Updates...", callback=self._on_check_updates
         )
         self._auto_update_item = rumps.MenuItem(
-            "Install Updates Automatically", callback=self._on_toggle_auto_update
+            "Download Updates Automatically", callback=self._on_toggle_auto_update
         )
         self._start_login_item = rumps.MenuItem(
             "Start at Login", callback=self._on_toggle_login
@@ -491,12 +490,12 @@ class MenuBarApp(rumps.App):
             if notes:
                 message += f"\n\nNotes:\n{notes}"
             if release.asset_url:
-                message += "\n\nInstall the latest update now?"
+                message += "\n\nDownload the latest update now?"
             if self.config.auto_update_download and release.asset_url:
                 self._run_auto_update(release.asset_url)
                 return
             if release.asset_url:
-                prompt = rumps.alert("Update available", message, ok="Install", cancel="Later")
+                prompt = rumps.alert("Update available", message, ok="Download", cancel="Later")
             else:
                 prompt = rumps.alert("Update available", message, ok="Open Release", cancel="Later")
             if prompt == 1:
@@ -513,16 +512,16 @@ class MenuBarApp(rumps.App):
 
     def _run_auto_update(self, asset_url: str) -> None:
         rumps.alert(
-            "Updating",
-            "Downloading and installing the latest version. The app will relaunch.",
+            "Downloading update",
+            "Downloading the latest version DMG to your Downloads folder.",
         )
-        bundle_path = find_app_bundle(sys.argv[0])
         try:
-            install_update(asset_url, bundle_path)
+            dmg_path = download_update(asset_url)
         except Exception as exc:
-            rumps.alert("Update failed", str(exc))
+            rumps.alert("Update download failed", str(exc))
             return
-        rumps.quit_application()
+        rumps.alert("Download complete", f"Saved to {dmg_path}.")
+        _open_path(str(dmg_path.parent))
 
 
 def _ensure_config() -> Config:
